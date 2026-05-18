@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOOKHUB — Black Corp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #FFD700;
+    --gold-bright: #FFF176;
+    --gold-dim: #B8860B;
+    --gold-glow: rgba(255, 215, 0, 0.4);
+    --black: #000000;
+    --black-deep: #020202;
+    --surface: rgba(255, 215, 0, 0.04);
+    --border: rgba(255, 215, 0, 0.2);
+    --text-dim: rgba(255, 215, 0, 0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--black-deep);
+    color: var(--gold);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* CANVAS PARTICLES */
+  #canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* HUD CORNERS */
+  .hud-corner {
+    position: fixed;
+    width: 80px; height: 80px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .hud-corner::before,
+  .hud-corner::after {
+    content: '';
+    position: absolute;
+    background: var(--gold);
+    opacity: 0.6;
+  }
+  .hud-corner::before { width: 2px; height: 40px; }
+  .hud-corner::after  { width: 40px; height: 2px; }
+
+  .hud-tl { top: 20px; left: 20px; }
+  .hud-tl::before { top: 0; left: 0; }
+  .hud-tl::after  { top: 0; left: 0; }
+
+  .hud-tr { top: 20px; right: 20px; }
+  .hud-tr::before { top: 0; right: 0; left: auto; }
+  .hud-tr::after  { top: 0; right: 0; left: auto; }
+
+  .hud-bl { bottom: 20px; left: 20px; }
+  .hud-bl::before { bottom: 0; left: 0; top: auto; }
+  .hud-bl::after  { bottom: 0; left: 0; top: auto; }
+
+  .hud-br { bottom: 20px; right: 20px; }
+  .hud-br::before { bottom: 0; right: 0; left: auto; top: auto; }
+  .hud-br::after  { bottom: 0; right: 0; left: auto; top: auto; }
+
+  /* HUD LABELS */
+  .hud-label {
+    position: fixed;
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .hud-label.tl { top: 28px; left: 70px; }
+  .hud-label.tr { top: 28px; right: 70px; text-align: right; }
+  .hud-label.bl { bottom: 28px; left: 70px; }
+  .hud-label.br { bottom: 28px; right: 70px; text-align: right; }
+
+  /* SCAN LINE */
+  .scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.15;
+    z-index: 3;
+    animation: scan 6s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scan {
+    0%   { top: -2px; }
+    100% { top: 100vh; }
+  }
+
+  /* MAIN LAYOUT */
+  .page {
+    position: relative;
+    z-index: 5;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 20px;
+  }
+
+  /* LOGO EMBLEM */
+  .emblem-wrap {
+    position: relative;
+    width: 130px;
+    height: 130px;
+    margin-bottom: 24px;
+    animation: emblem-in 1.2s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes emblem-in {
+    from { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+
+  .emblem-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    box-shadow:
+      0 0 20px var(--gold-glow),
+      0 0 60px rgba(255,215,0,0.2),
+      inset 0 0 20px rgba(255,215,0,0.05);
+    animation: ring-pulse 3s ease-in-out infinite;
+  }
+  @keyframes ring-pulse {
+    0%,100% { box-shadow: 0 0 20px var(--gold-glow), 0 0 60px rgba(255,215,0,0.2), inset 0 0 20px rgba(255,215,0,0.05); }
+    50%      { box-shadow: 0 0 35px rgba(255,215,0,0.7), 0 0 90px rgba(255,215,0,0.35), inset 0 0 30px rgba(255,215,0,0.1); }
+  }
+
+  .emblem-ring-outer {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,215,0,0.2);
+    animation: spin-slow 20s linear infinite;
+  }
+  .emblem-ring-outer::before,
+  .emblem-ring-outer::after {
+    content: '';
+    position: absolute;
+    background: var(--gold);
+    border-radius: 50%;
+    width: 6px; height: 6px;
+  }
+  .emblem-ring-outer::before { top: -3px; left: 50%; transform: translateX(-50%); }
+  .emblem-ring-outer::after  { bottom: -3px; left: 50%; transform: translateX(-50%); }
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+
+  .emblem-inner {
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #1a1200, #000);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .emblem-svg {
+    width: 72px;
+    height: 72px;
+    filter: drop-shadow(0 0 8px rgba(255,215,0,0.8));
+  }
+
+  /* TITLES */
+  .title-wrap {
+    text-align: center;
+    margin-bottom: 36px;
+    animation: title-in 1.4s cubic-bezier(0.16,1,0.3,1) 0.3s both;
+  }
+  @keyframes title-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2.4rem, 8vw, 4.5rem);
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    color: #fff;
+    text-shadow:
+      0 0 20px var(--gold),
+      0 0 50px rgba(255,215,0,0.5),
+      0 0 100px rgba(255,215,0,0.2);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.55rem, 2vw, 0.72rem);
+    letter-spacing: 0.35em;
+    color: var(--gold);
+    opacity: 0.7;
+    text-transform: uppercase;
+  }
+  .subtitle span {
+    color: var(--gold);
+    opacity: 1;
+    font-weight: 600;
+  }
+
+  /* BUTTONS */
+  .btns {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 520px;
+    animation: btns-in 1.4s cubic-bezier(0.16,1,0.3,1) 0.6s both;
+  }
+  @keyframes btns-in {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 28px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.75rem, 2.5vw, 0.95rem);
+    letter-spacing: 0.2em;
+    font-weight: 600;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+    backdrop-filter: blur(6px);
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,215,0,0.06), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+  }
+
+  .btn:hover::before { transform: translateX(100%); }
+
+  .btn:hover {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(255,215,0,0.3), inset 0 0 20px rgba(255,215,0,0.05);
+    background: rgba(255,215,0,0.05);
+  }
+
+  .btn-line {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn:hover .btn-line { opacity: 1; }
+
+  .btn-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: var(--gold);
+    opacity: 0.85;
+  }
+
+  .btn-text { flex: 1; text-align: left; }
+
+  .btn-arrow {
+    color: var(--gold);
+    font-size: 1rem;
+    opacity: 0.7;
+    transition: transform 0.3s, opacity 0.3s;
+  }
+  .btn:hover .btn-arrow {
+    transform: translateX(5px);
+    opacity: 1;
+  }
+
+  /* BOTTOM FOOTER */
+  .footer {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 5;
+    animation: fade-up 1.5s ease 1s both;
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .footer-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+  }
+
+  .footer-smile {
+    width: 18px;
+    height: 18px;
+    opacity: 0.5;
+    animation: blink 4s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%,90%,100% { opacity: 0.5; }
+    95% { opacity: 1; }
+  }
+
+  /* DIVIDER LINE */
+  .divider {
+    width: 100%;
+    max-width: 520px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,215,0,0.3), transparent);
+    margin-bottom: 36px;
+    animation: title-in 1.4s cubic-bezier(0.16,1,0.3,1) 0.5s both;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- HUD corners -->
+<div class="hud-corner hud-tl"></div>
+<div class="hud-corner hud-tr"></div>
+<div class="hud-corner hud-bl"></div>
+<div class="hud-corner hud-br"></div>
+
+<span class="hud-label tl">IBRS ECOSYSTEM</span>
+<span class="hud-label tr">BLACK CORP<br>MMXXIV</span>
+
+<div class="scanline"></div>
+
+<main class="page">
+
+  <!-- LOGO EMBLEM -->
+  <div class="emblem-wrap">
+    <div class="emblem-ring-outer"></div>
+    <div class="emblem-ring"></div>
+    <div class="emblem-inner">
+      <svg class="emblem-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <!-- Book pages glow -->
+        <defs>
+          <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+            <stop offset="0%" stop-color="#FFF9C4" stop-opacity="1"/>
+            <stop offset="60%" stop-color="#FFD700" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="f-glow">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Book body -->
+        <rect x="14" y="30" width="52" height="38" rx="3" fill="#0a0800" stroke="#FFD700" stroke-width="1.5"/>
+        <!-- Book spine -->
+        <rect x="37" y="30" width="6" height="38" fill="#1a1000" stroke="#FFD700" stroke-width="0.5"/>
+        <!-- Left page -->
+        <path d="M14 30 Q26 22 40 26 L40 68 Q26 64 14 68 Z" fill="#0d0a00" stroke="#FFD700" stroke-width="1.2"/>
+        <!-- Right page -->
+        <path d="M66 30 Q54 22 40 26 L40 68 Q54 64 66 68 Z" fill="#0d0a00" stroke="#FFD700" stroke-width="1.2"/>
+        <!-- Page glow top -->
+        <ellipse cx="40" cy="26" rx="20" ry="6" fill="url(#glow)" opacity="0.9"/>
+        <!-- Smile face on book cover -->
+        <g filter="url(#f-glow)" transform="translate(27, 38)">
+          <!-- Smile circle -->
+          <circle cx="13" cy="13" r="11" fill="#b8a000" stroke="#FFD700" stroke-width="1"/>
+          <!-- Crack line -->
+          <path d="M13 2 L15 8 L12 13 L14 20 L13 24" stroke="#000" stroke-width="1.5" fill="none"/>
+          <!-- Left eye -->
+          <ellipse cx="8" cy="10" rx="2" ry="2.5" fill="#000"/>
+          <!-- Eye patch right -->
+          <path d="M14 7 Q18 5 22 7 Q22 12 18 13 Q14 12 14 7 Z" fill="#000" stroke="#FFD700" stroke-width="0.5"/>
+          <!-- Smile -->
+          <path d="M5 17 Q13 23 21 17" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- Arrow tips on smile -->
+          <polygon points="5,17 3,14 7,15" fill="#000"/>
+          <polygon points="21,17 23,14 19,15" fill="#000"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- TITLES -->
+  <div class="title-wrap">
+    <h1>BOOKHUB</h1>
+    <p class="subtitle">POWERED BY <span>BLACK CORP</span></p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- BUTTONS -->
+  <div class="btns">
+
+    <a href="#" class="btn" onclick="return false;">
+      <div class="btn-line"></div>
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      </svg>
+      <span class="btn-text">ACESSAR BIBLIOTECA</span>
+      <span class="btn-arrow">›</span>
+    </a>
+
+    <a href="#" class="btn" onclick="return false;">
+      <div class="btn-line"></div>
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+      <span class="btn-text">ENTRAR NO TELEGRAM</span>
+      <span class="btn-arrow">›</span>
+    </a>
+
+    <a href="#" class="btn" onclick="return false;">
+      <div class="btn-line"></div>
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <span class="btn-text">DESBLOQUEAR ACESSO</span>
+      <span class="btn-arrow">›</span>
+    </a>
+
+  </div>
+
+</main>
+
+<!-- Footer -->
+<footer class="footer">
+  <span class="footer-label">IBRS ECOSYSTEM</span>
+  <svg class="footer-smile" viewBox="0 0 24 24" fill="currentColor" color="#FFD700">
+    <circle cx="12" cy="12" r="10" fill="#FFD700" opacity="0.8"/>
+    <ellipse cx="8.5" cy="10" rx="1.5" ry="2" fill="#000"/>
+    <path d="M12 2 L12.8 6 L12 10 L12.5 16 L12 19" stroke="#000" stroke-width="1.2" fill="none"/>
+    <path d="M7 16 10.5 8 14 10 17 8 7 16" fill="#000" opacity="0"/>
+    <path d="M7.5 15 Q12 19 16.5 15" stroke="#000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <rect x="13" y="8" width="5" height="4" rx="1" fill="#000" opacity="0.8"/>
+  </svg>
+</footer>
+
+<script>
+// PARTICLE SYSTEM
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const GOLD = [255, 215, 0];
+const particles = [];
+const NUM = 90;
+
+for (let i = 0; i < NUM; i++) {
+  particles.push({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    r: Math.random() * 1.5 + 0.3,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: -(Math.random() * 0.4 + 0.1),
+    alpha: Math.random() * 0.5 + 0.1,
+    life: Math.random(),
+    decay: Math.random() * 0.003 + 0.001,
+  });
+}
+
+// Grid lines
+const GRID_LINES = [];
+for (let i = 0; i < 5; i++) {
+  GRID_LINES.push({
+    y: Math.random() * window.innerHeight,
+    alpha: Math.random() * 0.04 + 0.01,
+    vy: (Math.random() - 0.5) * 0.15,
+  });
+}
+
+function drawFrame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Horizontal grid lines
+  GRID_LINES.forEach(line => {
+    line.y += line.vy;
+    if (line.y < 0) line.y = canvas.height;
+    if (line.y > canvas.height) line.y = 0;
+    ctx.beginPath();
+    ctx.moveTo(0, line.y);
+    ctx.lineTo(canvas.width, line.y);
+    ctx.strokeStyle = `rgba(255,215,0,${line.alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= p.decay;
+
+    if (p.life <= 0 || p.y < 0) {
+      p.x = Math.random() * canvas.width;
+      p.y = canvas.height + 5;
+      p.life = 1;
+      p.alpha = Math.random() * 0.5 + 0.1;
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,215,0,${p.alpha * p.life})`;
+    ctx.fill();
+  });
+
+  requestAnimationFrame(drawFrame);
+}
+drawFrame();
+
+// Button click ripple
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('click', function(e) {
+    const rect = btn.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const ripple = document.createElement('span');
+    ripple.style.cssText = `
+      position:absolute;left:${x}px;top:${y}px;
+      width:0;height:0;
+      border-radius:50%;
+      background:rgba(255,215,0,0.2);
+      transform:translate(-50%,-50%);
+      animation:ripple 0.6s ease-out forwards;
+      pointer-events:none;
+    `;
+    btn.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 700);
+  });
+});
+
+// Inject ripple keyframes
+const style = document.createElement('style');
+style.textContent = `@keyframes ripple { to { width:300px;height:300px;opacity:0; } }`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
